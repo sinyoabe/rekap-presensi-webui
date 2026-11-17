@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <title>Generator Rekap Presensi PDF & Word</title>
+    <!-- Library Client-Side untuk PDF dan DOCX -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://unpkg.com/docx@8.5.0/build/index.umd.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; background: #f0f2f5; display: flex; height: 100vh; }
+        .sidebar { width: 48%; padding: 20px; background: #ffffff; overflow-y: auto; border-right: 1px solid #ccc; box-sizing: border-box; }
+        .preview-area { width: 52%; padding: 20px; overflow-y: auto; display: flex; justify-content: center; align-items: flex-start; }
+        .form-group { margin-bottom: 10px; }
+        .form-group label { display: block; font-size: 12px; font-weight: bold; margin-bottom: 3px; }
+        .form-group input { width: 100%; padding: 6px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+        table.input-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12px; }
+        table.input-table th, table.input-table td { border: 1px solid #ddd; padding: 4px; }
+        table.input-table input { width: 100%; border: 1px solid #e0e0e0; border-radius: 3px; padding: 3px; box-sizing: border-box; font-size: 11px; }
+        .btn { padding: 8px 14px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; margin-top: 10px; }
+        .btn-primary { background: #1a73e8; color: white; }
+        .btn-success { background: #188038; color: white; }
+        .btn-word { background: #2b579a; color: white; }
+        .btn-secondary { background: #5f6368; color: white; font-size: 12px; padding: 5px 10px; }
+        .btn-danger { background: #d93025; color: white; padding: 3px 6px; font-size: 11px; border: none; border-radius: 3px; cursor: pointer; }
+
+        /* Gaya Kertas A4 */
+        .a4-page {
+            width: 210mm; min-height: 297mm; background: white; padding: 15mm 18mm;
+            box-sizing: border-box; box-shadow: 0 0 10px rgba(0,0,0,0.15);
+            font-family: "Times New Roman", Times, serif; color: #000; position: relative;
+        }
+        .header-kop { display: flex; align-items: center; justify-content: center; position: relative; margin-bottom: 22px; min-height: 54px; }
+        .logo-box { position: absolute; left: 10px; top: 0; }
+        .logo-box img { width: 48px; height: auto; }
+        .kop-text { text-align: center; font-weight: bold; font-size: 13pt; line-height: 1.25; }
+        .identitas { width: 100%; font-size: 11pt; font-weight: bold; margin-bottom: 14px; border-collapse: collapse; }
+        .identitas td { padding: 2px 0; vertical-align: top; }
+        .tabel-presensi { width: 100%; border-collapse: collapse; font-size: 10pt; margin-bottom: 16px; }
+        .tabel-presensi th, .tabel-presensi td { border: 1px solid #000; padding: 3.5px 6px; text-align: center; }
+        .tabel-presensi th { font-weight: bold; }
+        .tabel-presensi td.col-tanggal { text-align: left; padding-left: 8px; }
+        .rekap-bawah { font-size: 10pt; font-weight: bold; line-height: 1.35; margin-top: 10px; }
+        .footer-system { margin-top: 25px; text-align: right; font-size: 9.5pt; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div class="sidebar">
+    <h3 style="margin-top:0;">WebUI Rekap Presensi Pegawai</h3>
+    <div class="grid-2">
+        <div class="form-group"><label>Kop Baris 1</label><input type="text" id="kop1" value="Rekap Presensi Pegawai SDN" oninput="updatePreview()"></div>
+        <div class="form-group"><label>Kop Baris 2</label><input type="text" id="kop2" value="Sendangmulyo 04 Semarang" oninput="updatePreview()"></div>
+    </div>
+    <div class="grid-2">
+        <div class="form-group"><label>Bulan & Tahun</label><input type="text" id="bulanTahun" value="Bulan September 2026" oninput="updatePreview()"></div>
+        <div class="form-group"><label>Upload Logo Instansi (PNG/JPG)</label><input type="file" id="logoInput" accept="image/*" onchange="handleLogo(event)"></div>
+    </div>
+    <div class="grid-3">
+        <div class="form-group"><label>NIP</label><input type="text" id="nip" value="197908112025211039" oninput="updatePreview()"></div>
+        <div class="form-group"><label>Nama Pegawai</label><input type="text" id="nama" value="AGUS SUWITO, S.E." oninput="updatePreview()"></div>
+        <div class="form-group"><label>Jabatan</label><input type="text" id="jabatan" value="Penata Layanan Operasional" oninput="updatePreview()"></div>
+    </div>
+
+    <label style="font-size:12px; font-weight:bold;">Data Kehadiran Harian</label>
+    <table class="input-table" id="rowsTable">
+        <thead>
+            <tr>
+                <th style="width: 125px;">Hari/Tanggal</th>
+                <th style="width: 95px;">Jam Hadir</th>
+                <th>+/-</th>
+                <th style="width: 95px;">Jam Pulang</th>
+                <th>+/-</th>
+                <th>Status</th>
+                <th>Aksi</th>
+            </tr>
+        </thead>
+        <tbody id="inputTbody"></tbody>
+    </table>
+    <button type="button" class="btn btn-secondary" onclick="addRow()">+ Tambah Baris</button>
+
+    <hr style="margin: 15px 0;">
+    <div class="grid-3">
+        <div class="form-group"><label>Jumlah Hari Kerja</label><input type="text" id="hariKerja" value="22" oninput="updatePreview()"></div>
+        <div class="form-group"><label>Jumlah Hadir</label><input type="text" id="jmlHadir" value="22" oninput="updatePreview()"></div>
+        <div class="form-group"><label>Jumlah Tidak Hadir</label><input type="text" id="tidakHadir" value="0" oninput="updatePreview()"></div>
+    </div>
+    <div class="grid-3">
+        <div class="form-group"><label>Jumlah Konfirmasi</label><input type="text" id="konfirmasi" value="0" oninput="updatePreview()"></div>
+        <div class="form-group"><label>Jam Keterlambatan</label><input type="text" id="terlambat" value="00:00:00" oninput="updatePreview()"></div>
+        <div class="form-group"><label>Waktu Cetak (Printed on)</label><input type="text" id="printedTime" oninput="updatePreview()"></div>
+    </div>
+
+    <button type="button" class="btn btn-success" onclick="downloadPDF()">Download PDF</button>
+    <button type="button" class="btn btn-word" onclick="downloadDOCX()">Download Word (.docx)</button>
+</div>
+
+<div class="preview-area">
+    <div class="a4-page" id="a4Document">
+        <div class="header-kop">
+            <div class="logo-box" id="prevLogoBox">
+                <div style="width:45px; height:52px; border:1px dashed #999; font-size:8pt; display:flex; align-items:center; justify-content:center;">Logo</div>
+            </div>
+            <div class="kop-text">
+                <div id="prevKop1"></div>
+                <div id="prevKop2"></div>
+                <div id="prevBulan"></div>
+            </div>
+        </div>
+
+        <table class="identitas">
+            <tr><td style="width: 120px;">NIP</td><td style="width: 12px;"></td><td id="prevNip"></td></tr>
+            <tr><td>Nama Pegawai</td><td>:</td><td id="prevNama"></td></tr>
+            <tr><td>Jabatan</td><td>:</td><td id="prevJabatan"></td></tr>
+        </table>
+
+        <table class="tabel-presensi">
+            <thead>
+                <tr>
+                    <th style="width: 30px;">No</th>
+                    <th style="width: 155px;">Hari/Tanggal</th>
+                    <th style="width: 75px;">Jam Hadir</th>
+                    <th style="width: 75px;">+/-</th>
+                    <th style="width: 80px;">Jam Pulang</th>
+                    <th style="width: 75px;">+/-</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody id="prevTbody"></tbody>
+        </table>
+
+        <div class="rekap-bawah">
+            <div>Jumlah Hari Kerja: <span id="prevHariKerja"></span></div>
+            <div>Jumlah Hadir: <span id="prevJmlHadir"></span></div>
+            <div>Jumlah Tidak Hadir: <span id="prevTidakHadir"></span></div>
+            <div>Jumlah Konfirmasi: <span id="prevKonfirmasi"></span></div>
+            <div>Jam Keterlambatan: <span id="prevTerlambat"></span></div>
+        </div>
+
+        <div class="footer-system">
+            Printed by System on <span id="prevPrintedTime"></span>
+        </div>
+    </div>
+</div>
+
+<script>
+    const NAMA_HARI = ["MINGGU", "SENIN", "SELASA", "RABU", "KAMIS", "JUMAT", "SABTU"];
+    let logoDataUrl = null;
+
+    const initialRows = [
+        { date: "2026-09-01", hadir: "06:38:31", dHadir: "+01:04:52", pulang: "16:05:58", dPulang: "+00:10:58", status: "" },
+        { date: "2026-09-02", hadir: "06:52:39", dHadir: "+01:20:37", pulang: "16:07:26", dPulang: "+00:12:26", status: "" },
+        { date: "2026-09-03", hadir: "06:53:26", dHadir: "+01:13:48", pulang: "16:14:07", dPulang: "+00:19:07", status: "" },
+        { date: "2026-09-04", hadir: "06:25:50", dHadir: "+01:17:07", pulang: "15:44:46", dPulang: "+04:14:46", status: "" },
+        { date: "2026-09-07", hadir: "06:45:32", dHadir: "+01:28:16", pulang: "16:11:02", dPulang: "+00:16:02", status: "" }
+    ];
+
+    function formatTanggalIndo(dateStr) {
+        if (!dateStr) return "";
+        const [y, m, d] = dateStr.split("-");
+        const dt = new Date(y, m - 1, d);
+        return `${NAMA_HARI[dt.getDay()]}, ${d}-${m}-${y}`;
+    }
+
+    function addRow(data = { date: "", hadir: "06:45:00", dHadir: "+00:15:00", pulang: "16:00:00", dPulang: "+00:05:00", status: "" }) {
+        const tbody = document.getElementById("inputTbody");
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+            <td><input type="date" value="${data.date}" oninput="updatePreview()"></td>
+            <td><input type="time" step="1" value="${data.hadir}" oninput="updatePreview()"></td>
+            <td><input type="text" value="${data.dHadir}" oninput="updatePreview()"></td>
+            <td><input type="time" step="1" value="${data.pulang}" oninput="updatePreview()"></td>
+            <td><input type="text" value="${data.dPulang}" oninput="updatePreview()"></td>
+            <td><input type="text" value="${data.status}" oninput="updatePreview()"></td>
+            <td style="text-align:center;"><button type="button" class="btn-danger" onclick="this.closest('tr').remove(); updatePreview();">X</button></td>
+        `;
+        tbody.appendChild(tr);
+        updatePreview();
+    }
+
+    function handleLogo(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+            logoDataUrl = evt.target.result;
+            document.getElementById("prevLogoBox").innerHTML = `<img src="${logoDataUrl}" alt="Logo">`;
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function getRowsData() {
+        const rows = [];
+        document.querySelectorAll("#inputTbody tr").forEach(tr => {
+            const inputs = tr.querySelectorAll("input");
+            if (inputs[0].value) {
+                rows.push({
+                    tanggal: formatTanggalIndo(inputs[0].value),
+                    hadir: inputs[1].value,
+                    dHadir: inputs[2].value,
+                    pulang: inputs[3].value,
+                    dPulang: inputs[4].value,
+                    status: inputs[5].value
+                });
+            }
+        });
+        return rows;
+    }
+
+    function updatePreview() {
+        document.getElementById("prevKop1").innerText = document.getElementById("kop1").value;
+        document.getElementById("prevKop2").innerText = document.getElementById("kop2").value;
+        document.getElementById("prevBulan").innerText = document.getElementById("bulanTahun").value;
+        document.getElementById("prevNip").innerText = document.getElementById("nip").value;
+        document.getElementById("prevNama").innerText = document.getElementById("nama").value;
+        document.getElementById("prevJabatan").innerText = document.getElementById("jabatan").value;
+        document.getElementById("prevHariKerja").innerText = document.getElementById("hariKerja").value;
+        document.getElementById("prevJmlHadir").innerText = document.getElementById("jmlHadir").value;
+        document.getElementById("prevTidakHadir").innerText = document.getElementById("tidakHadir").value;
+        document.getElementById("prevKonfirmasi").innerText = document.getElementById("konfirmasi").value;
+        document.getElementById("prevTerlambat").innerText = document.getElementById("terlambat").value;
+        document.getElementById("prevPrintedTime").innerText = document.getElementById("printedTime").value;
+
+        const prevTbody = document.getElementById("prevTbody");
+        prevTbody.innerHTML = "";
+        getRowsData().forEach((r, i) => {
+            prevTbody.innerHTML += `
+                <tr>
+                    <td>${i + 1}</td>
+                    <td class="col-tanggal">${r.tanggal}</td>
+                    <td>${r.hadir}</td>
+                    <td>${r.dHadir}</td>
+                    <td>${r.pulang}</td>
+                    <td>${r.dPulang}</td>
+                    <td>${r.status}</td>
+                </tr>`;
+        });
+    }
+
+    function downloadPDF() {
+        const element = document.getElementById("a4Document");
+        const nama = document.getElementById("nama").value.replace(/[^a-zA-Z0-9]/g, "_");
+        const opt = {
+            margin: 0,
+            filename: `Rekap_Presensi_${nama}.pdf`,
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2, useCORS: true },
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        };
+        html2pdf().set(opt).from(element).save();
+    }
+
+    function downloadDOCX() {
+        const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, AlignmentType, BorderStyle } = docx;
+        const rowsData = getRowsData();
+        const border = { style: BorderStyle.SINGLE, size: 6, color: "000000" };
+        const cellBorders = { top: border, bottom: border, left: border, right: border };
+        const noBorder = { style: BorderStyle.NONE, size: 0, color: "FFFFFF" };
+        const noBorders = { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder };
+
+        const tRows = [
+            new TableRow({
+                children: ["No", "Hari/Tanggal", "Jam Hadir", "+/-", "Jam Pulang", "+/-", "Status"].map((h, i) =>
+                    new TableCell({
+                        borders: cellBorders,
+                        width: { size: [600, 2700, 1250, 1250, 1250, 1250, 1500][i], type: WidthType.DXA },
+                        children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: h, bold: true, font: "Times New Roman", size: 20 })] })]
+                    })
+                )
+            })
+        ];
+
+        rowsData.forEach((r, idx) => {
+            const vals = [String(idx + 1), r.tanggal, r.hadir, r.dHadir, r.pulang, r.dPulang, r.status];
+            tRows.push(new TableRow({
+                children: vals.map((v, i) =>
+                    new TableCell({
+                        borders: cellBorders,
+                        width: { size: [600, 2700, 1250, 1250, 1250, 1250, 1500][i], type: WidthType.DXA },
+                        children: [new Paragraph({ alignment: i === 1 ? AlignmentType.LEFT : AlignmentType.CENTER, children: [new TextRun({ text: v, font: "Times New Roman", size: 20 })] })]
+                    })
+                )
+            }));
+        });
+
+        const doc = new Document({
+            sections: [{
+                properties: { page: { margin: { top: 850, bottom: 850, left: 1020, right: 1020 } } },
+                children: [
+                    new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: document.getElementById("kop1").value, bold: true, font: "Times New Roman", size: 26 })] }),
+                    new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: document.getElementById("kop2").value, bold: true, font: "Times New Roman", size: 26 })] }),
+                    new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 280 }, children: [new TextRun({ text: document.getElementById("bulanTahun").value, bold: true, font: "Times New Roman", size: 26 })] }),
+                    new Table({
+                        rows: [
+                            ["NIP", "", document.getElementById("nip").value],
+                            ["Nama Pegawai", ":", document.getElementById("nama").value],
+                            ["Jabatan", ":", document.getElementById("jabatan").value]
+                        ].map(item => new TableRow({
+                            children: item.map((txt, idx) => new TableCell({
+                                borders: noBorders,
+                                width: { size: [1900, 250, 7650][idx], type: WidthType.DXA },
+                                children: [new Paragraph({ children: [new TextRun({ text: txt, bold: true, font: "Times New Roman", size: 22 })] })]
+                            }))
+                        }))
+                    }),
+                    new Paragraph({ spacing: { before: 150 } }),
+                    new Table({ rows: tRows }),
+                    new Paragraph({
+                        spacing: { before: 240 },
+                        children: [
+                            new TextRun({ text: `Jumlah Hari Kerja: ${document.getElementById("hariKerja").value}\n`, bold: true, font: "Times New Roman", size: 20, break: 0 }),
+                            new TextRun({ text: `Jumlah Hadir: ${document.getElementById("jmlHadir").value}`, bold: true, font: "Times New Roman", size: 20, break: 1 }),
+                            new TextRun({ text: `Jumlah Tidak Hadir: ${document.getElementById("tidakHadir").value}`, bold: true, font: "Times New Roman", size: 20, break: 1 }),
+                            new TextRun({ text: `Jumlah Konfirmasi: ${document.getElementById("konfirmasi").value}`, bold: true, font: "Times New Roman", size: 20, break: 1 }),
+                            new TextRun({ text: `Jam Keterlambatan: ${document.getElementById("terlambat").value}`, bold: true, font: "Times New Roman", size: 20, break: 1 })
+                        ]
+                    }),
+                    new Paragraph({
+                        alignment: AlignmentType.RIGHT,
+                        spacing: { before: 300 },
+                        children: [new TextRun({ text: `Printed by System on ${document.getElementById("printedTime").value}`, bold: true, font: "Times New Roman", size: 19 })]
+                    })
+                ]
+            }]
+        });
+
+        const nama = document.getElementById("nama").value.replace(/[^a-zA-Z0-9]/g, "_");
+        Packer.toBlob(doc).then(blob => saveAs(blob, `Rekap_Presensi_${nama}.docx`));
+    }
+
+    // Set waktu cetak default & muat baris awal
+    const now = new Date();
+    document.getElementById("printedTime").value = `${String(now.getDate()).padStart(2,'0')}-${String(now.getMonth()+1).padStart(2,'0')}-${now.getFullYear()} ${now.toTimeString().split(' ')[0]}`;
+    initialRows.forEach(r => addRow(r));
+</script>
+</body>
+</html>
