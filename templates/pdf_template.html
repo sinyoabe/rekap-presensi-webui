@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <style>
+        @page {
+            size: A4 portrait;
+            margin: 15mm 18mm;
+        }
+        body {
+            font-family: "Times New Roman", Times, serif;
+            color: #000;
+            margin: 0;
+            padding: 0;
+        }
+        .header-kop {
+            position: relative;
+            text-align: center;
+            margin-bottom: 22px;
+            min-height: 54px;
+        }
+        .logo-box {
+            position: absolute;
+            left: 10px;
+            top: 0;
+        }
+        .logo-box img {
+            width: 48px;
+            height: auto;
+        }
+        .kop-text {
+            text-align: center;
+            font-weight: bold;
+            font-size: 13pt;
+            line-height: 1.25;
+        }
+        .identitas {
+            width: 100%;
+            font-size: 11pt;
+            font-weight: bold;
+            margin-bottom: 14px;
+            border-collapse: collapse;
+        }
+        .identitas td {
+            padding: 2px 0;
+            vertical-align: top;
+        }
+        .tabel-presensi {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 10pt;
+            margin-bottom: 16px;
+        }
+        .tabel-presensi th, .tabel-presensi td {
+            border: 1px solid #000;
+            padding: 3.5px 6px;
+            text-align: center;
+        }
+        .tabel-presensi th {
+            font-weight: bold;
+        }
+        .tabel-presensi td.col-tanggal {
+            text-align: left;
+            padding-left: 8px;
+        }
+        .rekap-bawah {
+            font-size: 10pt;
+            font-weight: bold;
+            line-height: 1.35;
+            margin-top: 10px;
+        }
+        .footer-system {
+            margin-top: 25px;
+            text-align: right;
+            font-size: 9.5pt;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="header-kop">
+        <div class="logo-box">
+            {% if logo_base64 %}
+                <img src="{{ logo_base64 }}" alt="Logo">
+            {% endif %}
+        </div>
+        <div class="kop-text">
+            <div>{{ data.instansi_baris1 }}</div>
+            <div>{{ data.instansi_baris2 }}</div>
+            <div>{{ data.bulan_tahun }}</div>
+        </div>
+    </div>
+
+    <table class="identitas">
+        <tr>
+            <td style="width: 120px;">NIP</td>
+            <td style="width: 12px;"></td>
+            <td>{{ data.nip }}</td>
+        </tr>
+        <tr>
+            <td>Nama Pegawai</td>
+            <td>:</td>
+            <td>{{ data.nama }}</td>
+        </tr>
+        <tr>
+            <td>Jabatan</td>
+            <td>:</td>
+            <td>{{ data.jabatan }}</td>
+        </tr>
+    </table>
+
+    <table class="tabel-presensi">
+        <thead>
+            <tr>
+                <th style="width: 30px;">No</th>
+                <th style="width: 155px;">Hari/Tanggal</th>
+                <th style="width: 75px;">Jam Hadir</th>
+                <th style="width: 75px;">+/-</th>
+                <th style="width: 80px;">Jam Pulang</th>
+                <th style="width: 75px;">+/-</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in data.rows %}
+            <tr>
+                <td>{{ loop.index }}</td>
+                <td class="col-tanggal">{{ row.tanggal }}</td>
+                <td>{{ row.hadir }}</td>
+                <td>{{ row.diff_hadir }}</td>
+                <td>{{ row.pulang }}</td>
+                <td>{{ row.diff_pulang }}</td>
+                <td>{{ row.status }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="rekap-bawah">
+        <div>Jumlah Hari Kerja: {{ data.hari_kerja }}</div>
+        <div>Jumlah Hadir: {{ data.hadir }}</div>
+        <div>Jumlah Tidak Hadir: {{ data.tidak_hadir }}</div>
+        <div>Jumlah Konfirmasi: {{ data.konfirmasi }}</div>
+        <div>Jam Keterlambatan: {{ data.keterlambatan }}</div>
+    </div>
+
+    <div class="footer-system">
+        Printed by System on {{ data.printed_time }}
+    </div>
+</body>
+</html>

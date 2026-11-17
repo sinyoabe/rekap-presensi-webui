@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <title>Generator Rekap Presensi PDF</title>
+    <style>
+        /* Gaya WebUI (Layar) */
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            background: #f0f2f5;
+            display: flex;
+            height: 100vh;
+        }
+        .sidebar {
+            width: 48%;
+            padding: 20px;
+            background: #ffffff;
+            overflow-y: auto;
+            border-right: 1px solid #ccc;
+            box-sizing: border-box;
+        }
+        .preview-area {
+            width: 52%;
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+        }
+        .form-group { margin-bottom: 10px; }
+        .form-group label { display: block; font-size: 12px; font-weight: bold; margin-bottom: 3px; }
+        .form-group input { width: 100%; padding: 6px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+        
+        table.input-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12px; }
+        table.input-table th, table.input-table td { border: 1px solid #ddd; padding: 4px; }
+        table.input-table input { 
+            width: 100%; 
+            border: 1px solid #e0e0e0; 
+            border-radius: 3px;
+            padding: 3px; 
+            box-sizing: border-box; 
+            font-size: 11px; 
+            font-family: inherit;
+        }
+        
+        .btn { padding: 8px 14px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; margin-top: 10px; }
+        .btn-primary { background: #1a73e8; color: white; }
+        .btn-success { background: #188038; color: white; }
+        .btn-secondary { background: #5f6368; color: white; font-size: 12px; padding: 5px 10px; }
+        .btn-danger { background: #d93025; color: white; padding: 3px 6px; font-size: 11px; border: none; border-radius: 3px; cursor: pointer; }
+
+        /* Gaya Kertas A4 (Sesuai Gambar Contoh) */
+        .a4-page {
+            width: 210mm;
+            min-height: 297mm;
+            background: white;
+            padding: 15mm 18mm;
+            box-sizing: border-box;
+            box-shadow: 0 0 10px rgba(0,0,0,0.15);
+            font-family: "Times New Roman", Times, serif;
+            color: #000;
+            position: relative;
+        }
+        .header-kop {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            margin-bottom: 22px;
+        }
+        .logo-box {
+            position: absolute;
+            left: 10px;
+            top: 0;
+        }
+        .logo-box img {
+            width: 48px;
+            height: auto;
+        }
+        .kop-text {
+            text-align: center;
+            font-weight: bold;
+            font-size: 13pt;
+            line-height: 1.25;
+        }
+        .identitas {
+            width: 100%;
+            font-size: 11pt;
+            font-weight: bold;
+            margin-bottom: 14px;
+            border-collapse: collapse;
+        }
+        .identitas td {
+            padding: 2px 0;
+            vertical-align: top;
+        }
+        .tabel-presensi {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 10pt;
+            margin-bottom: 16px;
+        }
+        .tabel-presensi th, .tabel-presensi td {
+            border: 1px solid #000;
+            padding: 3.5px 6px;
+            text-align: center;
+        }
+        .tabel-presensi th {
+            font-weight: bold;
+        }
+        .tabel-presensi td.col-tanggal {
+            text-align: left;
+            padding-left: 8px;
+        }
+        .rekap-bawah {
+            font-size: 10pt;
+            font-weight: bold;
+            line-height: 1.35;
+            margin-top: 10px;
+        }
+        .footer-system {
+            margin-top: 25px;
+            text-align: right;
+            font-size: 9.5pt;
+            font-weight: bold;
+        }
+
+        /* Aturan Cetak PDF */
+        @media print {
+            @page {
+                size: A4 portrait;
+                margin: 0;
+            }
+            body {
+                background: none;
+                display: block;
+                height: auto;
+            }
+            .sidebar {
+                display: none !important;
+            }
+            .preview-area {
+                width: 100%;
+                padding: 0;
+                display: block;
+            }
+            .a4-page {
+                box-shadow: none;
+                width: 100%;
+                min-height: auto;
+                padding: 15mm 18mm;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="sidebar">
+    <h3 style="margin-top:0;">WebUI Rekap Presensi Pegawai</h3>
+    <form method="POST" action="/" enctype="multipart/form-data"><input type="hidden" name="logo_base64_hidden" value="{{ logo_base64 or "" }}">
+        <div class="grid-2">
+            <div class="form-group">
+                <label>Kop Baris 1</label>
+                <input type="text" name="instansi_baris1" value="{{ data.instansi_baris1 }}">
+            </div>
+            <div class="form-group">
+                <label>Kop Baris 2</label>
+                <input type="text" name="instansi_baris2" value="{{ data.instansi_baris2 }}">
+            </div>
+        </div>
+        <div class="grid-2">
+            <div class="form-group">
+                <label>Bulan & Tahun</label>
+                <input type="text" name="bulan_tahun" value="{{ data.bulan_tahun }}">
+            </div>
+            <div class="form-group">
+                <label>Upload Logo Instansi (PNG/JPG)</label>
+                <input type="file" name="logo" accept="image/*">
+            </div>
+        </div>
+
+        <div class="grid-3">
+            <div class="form-group">
+                <label>NIP</label>
+                <input type="text" name="nip" value="{{ data.nip }}">
+            </div>
+            <div class="form-group">
+                <label>Nama Pegawai</label>
+                <input type="text" name="nama" value="{{ data.nama }}">
+            </div>
+            <div class="form-group">
+                <label>Jabatan</label>
+                <input type="text" name="jabatan" value="{{ data.jabatan }}">
+            </div>
+        </div>
+
+        <label style="font-size:12px; font-weight:bold;">Data Kehadiran Harian</label>
+        <table class="input-table" id="rowsTable">
+            <thead>
+                <tr>
+                    <th style="width: 125px;">Hari/Tanggal</th>
+                    <th style="width: 95px;">Jam Hadir</th>
+                    <th>+/-</th>
+                    <th style="width: 95px;">Jam Pulang</th>
+                    <th>+/-</th>
+                    <th>Status</th>
+                    <th>Aksi</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in data.rows %}
+                <tr>
+                    <td><input type="date" name="tanggal[]" value="{{ row.date_raw }}"></td>
+                    <td><input type="time" step="1" name="jam_hadir[]" value="{{ row.hadir }}"></td>
+                    <td><input type="text" name="diff_hadir[]" value="{{ row.diff_hadir }}"></td>
+                    <td><input type="time" step="1" name="jam_pulang[]" value="{{ row.pulang }}"></td>
+                    <td><input type="text" name="diff_pulang[]" value="{{ row.diff_pulang }}"></td>
+                    <td><input type="text" name="status[]" value="{{ row.status }}"></td>
+                    <td style="text-align:center;"><button type="button" class="btn-danger" onclick="removeRow(this)">X</button></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <button type="button" class="btn btn-secondary" onclick="addRow()">+ Tambah Baris</button>
+
+        <hr style="margin: 15px 0;">
+        <div class="grid-3">
+            <div class="form-group">
+                <label>Jumlah Hari Kerja</label>
+                <input type="text" name="hari_kerja" value="{{ data.hari_kerja }}">
+            </div>
+            <div class="form-group">
+                <label>Jumlah Hadir</label>
+                <input type="text" name="hadir" value="{{ data.hadir }}">
+            </div>
+            <div class="form-group">
+                <label>Jumlah Tidak Hadir</label>
+                <input type="text" name="tidak_hadir" value="{{ data.tidak_hadir }}">
+            </div>
+        </div>
+        <div class="grid-3">
+            <div class="form-group">
+                <label>Jumlah Konfirmasi</label>
+                <input type="text" name="konfirmasi" value="{{ data.konfirmasi }}">
+            </div>
+            <div class="form-group">
+                <label>Jam Keterlambatan</label>
+                <input type="text" name="keterlambatan" value="{{ data.keterlambatan }}">
+            </div>
+            <div class="form-group">
+                <label>Waktu Cetak (Printed on)</label>
+                <input type="text" name="printed_time" value="{{ data.printed_time }}">
+            </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Update Preview</button>
+        <button type="submit" formaction="/download-pdf" class="btn btn-success">Download PDF</button> <button type="submit" formaction="/download-docx" class="btn" style="background:#2b579a; color:white;">Download Word (.docx)</button>
+    </form>
+</div>
+
+<div class="preview-area">
+    <div class="a4-page">
+        <div class="header-kop">
+            <div class="logo-box">
+                {% if logo_base64 %}
+                    <img src="{{ logo_base64 }}" alt="Logo">
+                {% else %}
+                    <div style="width:45px; height:52px; border:1px dashed #999; font-size:8pt; display:flex; align-items:center; justify-content:center; text-align:center;">Logo</div>
+                {% endif %}
+            </div>
+            <div class="kop-text">
+                <div>{{ data.instansi_baris1 }}</div>
+                <div>{{ data.instansi_baris2 }}</div>
+                <div>{{ data.bulan_tahun }}</div>
+            </div>
+        </div>
+
+        <table class="identitas">
+            <tr>
+                <td style="width: 120px;">NIP</td>
+                <td style="width: 12px;"></td>
+                <td>{{ data.nip }}</td>
+            </tr>
+            <tr>
+                <td>Nama Pegawai</td>
+                <td>:</td>
+                <td>{{ data.nama }}</td>
+            </tr>
+            <tr>
+                <td>Jabatan</td>
+                <td>:</td>
+                <td>{{ data.jabatan }}</td>
+            </tr>
+        </table>
+
+        <table class="tabel-presensi">
+            <thead>
+                <tr>
+                    <th style="width: 30px;">No</th>
+                    <th style="width: 155px;">Hari/Tanggal</th>
+                    <th style="width: 75px;">Jam Hadir</th>
+                    <th style="width: 75px;">+/-</th>
+                    <th style="width: 80px;">Jam Pulang</th>
+                    <th style="width: 75px;">+/-</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in data.rows %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td class="col-tanggal">{{ row.tanggal }}</td>
+                    <td>{{ row.hadir }}</td>
+                    <td>{{ row.diff_hadir }}</td>
+                    <td>{{ row.pulang }}</td>
+                    <td>{{ row.diff_pulang }}</td>
+                    <td>{{ row.status }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <div class="rekap-bawah">
+            <div>Jumlah Hari Kerja: {{ data.hari_kerja }}</div>
+            <div>Jumlah Hadir: {{ data.hadir }}</div>
+            <div>Jumlah Tidak Hadir: {{ data.tidak_hadir }}</div>
+            <div>Jumlah Konfirmasi: {{ data.konfirmasi }}</div>
+            <div>Jam Keterlambatan: {{ data.keterlambatan }}</div>
+        </div>
+
+        <div class="footer-system">
+            Printed by System on {{ data.printed_time }}
+        </div>
+    </div>
+</div>
+
+<script>
+    function addRow() {
+        const tbody = document.querySelector("#rowsTable tbody");
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+            <td><input type="date" name="tanggal[]"></td>
+            <td><input type="time" step="1" name="jam_hadir[]" value="06:45:00"></td>
+            <td><input type="text" name="diff_hadir[]" placeholder="+00:15:00"></td>
+            <td><input type="time" step="1" name="jam_pulang[]" value="16:00:00"></td>
+            <td><input type="text" name="diff_pulang[]" placeholder="+00:05:00"></td>
+            <td><input type="text" name="status[]"></td>
+            <td style="text-align:center;"><button type="button" class="btn-danger" onclick="removeRow(this)">X</button></td>
+        `;
+        tbody.appendChild(tr);
+    }
+
+    function removeRow(btn) {
+        btn.closest("tr").remove();
+    }
+</script>
+
+</body>
+</html>
